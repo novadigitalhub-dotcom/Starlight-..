@@ -33,12 +33,12 @@ input,select{background:#000;border:1px solid var(--c);color:var(--c);padding:10
 #reply{min-height:54px;padding:10px;background:rgba(0,229,255,.07);border:1px solid var(--d);color:#fff;margin-bottom:8px}
 @keyframes spin{100%{transform:rotate(360deg)}}
 @keyframes dance{100%{height:26px}}
-@media(max-width:800px){.grid{grid-
+@media(max-width:800px){.grid{grid-template-columns:1fr}.core{order:-1}}
 </style>
 </head>
 <body>
 <header>
-  <div><h1>STARLIGHT</h1><small>JARVIS TACTICAL HUD</small></div>
+  <div><h1>STARLIGHT</h1><small>PRIME COMMAND HUD</small></div>
   <div style="text-align:right">
     <div id="clk" style="font-weight:bold;font-size:1.1rem">00:00:00</div>
     <div id="dt" style="font-size:.7rem">--</div>
@@ -68,7 +68,7 @@ input,select{background:#000;border:1px solid var(--c);color:var(--c);padding:10
     <div>CPU: <span id="cpuT">32%</span></div><div class="bar"><div id="cpuB" style="width:32%"></div></div>
     <div>RAM: <span id="ramT">58%</span></div><div class="bar"><div id="ramB" style="width:58%"></div></div>
     <div>BATTERY: <span id="batT">--%</span></div><div class="bar"><div id="batB" style="width:100%"></div></div>
-    <div>NETWORK: <span id="netT">ONLINE</span></div><div class="bar"><div id="netB" style="width:95%"></div></div>
+    <div>MEMORY NODES: <span id="memT">0</span></div><div class="bar"><div id="memB" style="width:10%"></div></div>
   </div>
 
   <div class="box core">
@@ -91,21 +91,41 @@ input,select{background:#000;border:1px solid var(--c);color:var(--c);padding:10
 </div>
 
 <div class="box">
-  <div id="reply">STARLIGHT: Online. Tap ⚙️ CONFIG to save your Gemini API key, or press TALK TO ME.</div>
+  <div id="reply">STARLIGHT: Prime vocal core online. Neural memory active. I await your command, Boss.</div>
   <div class="row">
     <input id="inp" placeholder="Type a command or question..." onkeypress="if(event.key==='Enter')ask()">
     <button class="btn" onclick="ask()">ASK</button>
   </div>
 </div>
 <script>
+let chatHistory = [];
 const log=m=>{const l=document.getElementById('log');l.innerHTML+=`<div>> ${m}</div>`;l.scrollTop=l.scrollHeight};
-const say=t=>{document.getElementById('reply').textContent='STARLIGHT: '+t;if('speechSynthesis'in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.pitch=.9;u.onstart=()=>wv.classList.add('on');u.onend=()=>wv.classList.remove('on');speechSynthesis.speak(u)}};
+
+// DEEP COMMANDER VOICE (Optimus Prime / Cybertronian Bass)
+function say(t){
+  document.getElementById('reply').textContent='STARLIGHT: '+t;
+  if(!('speechSynthesis'in window))return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);
+  const vs=speechSynthesis.getVoices();
+  const deepVoice=vs.find(v=>v.lang.includes('en')&&(v.name.includes('Male')||v.name.includes('David')||v.name.includes('Daniel')||v.name.includes('UK')||v.name.includes('Google US English')))||vs.find(v=>v.lang.includes('en'));
+  if(deepVoice)u.voice=deepVoice;
+  u.pitch=0.55;
+  u.rate=0.92;
+  u.volume=1.0;
+  u.onstart=()=>wv.classList.add('on');
+  u.onend=()=>wv.classList.remove('on');
+  u.onerror=()=>wv.classList.remove('on');
+  speechSynthesis.speak(u);
+}
+if('speechSynthesis'in window)speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
 
 setInterval(()=>{const n=new Date();clk.textContent=n.toLocaleTimeString();dt.textContent=n.toDateString()},1000);
-setInterval(()=>{const c=20+Math.floor(Math.random()*35),r=50+Math.floor(Math.random()*25);cpuT.textContent=c+'%';cpuB.style.width=c+'%';ramT.textContent=r+'%';ramB.style.width=r+'%';netT.textContent=navigator.onLine?'ONLINE':'OFFLINE'},2500);
+setInterval(()=>{const c=20+Math.floor(Math.random()*35),r=50+Math.floor(Math.random()*25);cpuT.textContent=c+'%';cpuB.style.width=c+'%';ramT.textContent=r+'%';ramB.style.width=r+'%'},2500);
 if(navigator.getBattery)navigator.getBattery().then(b=>{const u=()=>{const p=Math.round(b.level*100);batT.textContent=p+'%'+(b.charging?'⚡':'');batB.style.width=p+'%'};u();b.onlevelchange=u;b.onchargingchange=u});
 
-function saveKey(){localStorage.setItem('sk_key',keyIn.value.trim());log('API Key saved');say('Neural key saved, Boss.')}
+function updateMemBar(){memT.textContent=chatHistory.length+' msgs';memB.style.width=Math.min(100,chatHistory.length*10)+'%'}
+function saveKey(){localStorage.setItem('sk_key',keyIn.value.trim());document.getElementById('cfg').classList.remove('open');log('API Key saved');say('Neural key locked in, Boss.')}
 function getCmds(){return JSON.parse(localStorage.getItem('sk_cmds')||'[]')}
 function renderCmds(){cList.innerHTML=getCmds().map((c,i)=>`<div>• "${c.t}" → ${c.a} <button onclick="delCmd(${i})" style="color:red;background:none;border:none">[X]</button></div>`).join('')}
 function addCmd(){if(!cTrig.value||!cAct.value)return;const l=getCmds();l.push({t:cTrig.value.toLowerCase().trim(),y:cType.value,a:cAct.value.trim()});localStorage.setItem('sk_cmds',JSON.stringify(l));cTrig.value='';cAct.value='';renderCmds();log('Custom command added')}
@@ -116,35 +136,24 @@ if('webkitSpeechRecognition'in window||'SpeechRecognition'in window){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   rec=new SR();rec.lang='en-US';
   rec.onstart=()=>{document.getElementById('mic').classList.add('rec');document.getElementById('mic').textContent='🛑 LISTENING...';wv.classList.add('on');log('Listening...')};
-  rec.onresult=e=>{inp.value=e.results[0][0].transcript;log('Heard: '+inp.value);ask()};
+  rec.onresult=e=>{inp.value=e.results.transcript;log('Heard: '+inp.value);ask()};
   rec.onend=()=>{document.getElementById('mic').classList.remove('rec');document.getElementById('mic').textContent='🎙️ TALK TO ME';wv.classList.remove('on')};
   rec.onerror=e=>log('Mic error: '+e.error);
 }
-function mic(){if(!rec)return alert('Use Google Chrome on HTTPS');rec.start()}
+function mic(){if(!rec)return alert('Use Google Chrome on HTTPS');speechSynthesis.cancel();rec.start()}
 
 async function ask(){
   const q=inp.value.trim();if(!q)return;inp.value='';const l=q.toLowerCase();log('Query: '+q);
+
+  if(l.includes('clear memory')||l.includes('forget everything')||l==='reset'){
+    chatHistory=[];updateMemBar();log('Memory wiped');
+    return say('Neural memory banks cleared, Boss. Ready for a new mission.');
+  }
+
   const c=getCmds().find(x=>l.includes(x.t));
-  if(c){if(c.y==='url'){say('Opening '+c.t);window.open(c.a.startsWith('http')?c.a:'https://'+c.a,'_blank')}else say(c.a);return}
+  if(c){if(c.y==='url'){say('Engaging '+c.t+', Boss.');window.open(c.a.startsWith('http')?c.a:'https://'+c.a,'_blank')}else say(c.a);return}
   if(l.includes('time'))return say('The time is '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+', Boss.');
-  if(l.includes('open youtube')){say('Opening YouTube, Boss.');window.open('https://youtube.com','_blank');return}
-  if(l==='hello'||l==='hi'||l.startsWith('hello '))return say('Hello Boss! STARLIGHT is online and ready.');
+  if(l.includes('open youtube')){say('Launching YouTube protocols, Boss.');window.open('https://youtube.com','_blank');return}
+  if(l==='hello'||l==='hi'||l.startsWith('hello '))return say('Greetings, Boss. All systems stand ready at your command.');
 
   const k=localStorage.getItem('sk_key');
-  if(!k){document.getElementById('cfg').classList.add('open');return say('Please paste your Gemini API key in CONFIG first, Boss.')}
-  document.getElementById('reply').textContent='STARLIGHT: Thinking...';
-  try{
-    const r=await fetch(`https://googleapis.com{k}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({systemInstruction:{parts:[{text:'You are STARLIGHT, a cool Jarvis-style AI assistant. Answer short, smart, and friendly.'}]},contents:[{parts:[{text:q}]}]})
-    });
-    const d=await r.json();
-    if(d.error)throw new Error(d.error.message);
-    const ans=(d.candidates?.[0]?.content?.parts?.[0]?.text||'No reply.').replace(/\*/g,'');
-    say(ans);log('Reply sent');
-  }catch(e){say('Error: '+e.message);log('Error: '+e.message)}
-}
-window.onload=()=>{if(localStorage.getItem('sk_key'))keyIn.value=localStorage.getItem('sk_key');renderCmds();log('JARVIS online');log('Voice ready')};
-</script>
-</body>
-  </html>
